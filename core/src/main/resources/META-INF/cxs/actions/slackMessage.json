@@ -10,12 +10,5 @@
     ],
     "readOnly": true
   },
-  "actionExecutor": "slackMessage",
-  "parameters": [
-    {
-      "id": "slackChannel",
-      "type": "string",
-      "multivalued": false
-    }
-  ]
+  "actionExecutor": "slackMessage"
 }

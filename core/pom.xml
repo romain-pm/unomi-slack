@@ -37,15 +37,9 @@
 		<dependency>
 			<groupId>org.json</groupId>
 			<artifactId>json</artifactId>
-			<version>20090211</version>
+			<version>20180813</version>
 		</dependency>
-		
-		<dependency>
-			<groupId>junit</groupId>     <!-- NOT org.junit here -->
-			<artifactId>junit-dep</artifactId>
-			<version>4.8.2</version>
-		</dependency>
-		
+
 		<dependency>
 			<groupId>org.osgi</groupId>
 			<artifactId>org.osgi.core</artifactId>
@@ -71,9 +65,10 @@
 		</dependency>
 
 		<dependency>
-			<groupId>org.apache.httpcomponents</groupId>
-			<artifactId>httpclient</artifactId>
-			<version>4.5.6</version>
+		  <groupId>org.apache.httpcomponents</groupId>
+		  <artifactId>httpclient-osgi</artifactId>
+		  <version>4.5.6</version>
+		  <type>bundle</type>
 		</dependency>
 
 	</dependencies>

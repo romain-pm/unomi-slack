@@ -57,10 +57,10 @@ public class SlackMessageAction implements ActionExecutor {
 	private String slackMessageColor;
 	private String slackMessageText;
 	private String slackMessageFallback;
-	
+
 	private String unomiProfileUrl;
 	private String unomiSystemTagsExclude;
-	
+
 	private ProfileService profileService;
 
 	/**
@@ -77,14 +77,14 @@ public class SlackMessageAction implements ActionExecutor {
 				logger.debug("Action parameters {} ", action.getParameterValues().toString());
 			}
 
-			internalExecute(action, event);
+			int eventServiceStatus = internalExecute(action, event);
 
 			if (logger.isDebugEnabled()) {
 				logger.debug("Action {} is done for event id {} and type {}", SlackMessageAction.class.getName(),
 						event.getItemId(), event.getEventType());
 			}
 
-			return EventService.NO_CHANGE;
+			return eventServiceStatus;
 		} catch (Exception e) {
 			logger.error("Error when executing action", e);
 			logger.error("action {}", action);
@@ -118,36 +118,40 @@ public class SlackMessageAction implements ActionExecutor {
 
 	/**
 	 * Loosy method to remove that log some stuff
+	 * 
 	 * @param action
 	 * @param event
 	 */
 	private void supperLogger(Action action, Event event) {
 
-		logger.warn("Event type: {} - item type: {} - version: {}", event.getEventType(),
-				event.getItemType(), event.getVersion());
-		
+		logger.warn("Event type: {} - item type: {} - version: {}", event.getEventType(), event.getItemType(),
+				event.getVersion());
+
 		for (Parameter actionParameter : action.getActionType().getParameters()) {
-			logger.warn("Action - actionParameter id: {} - type {}", actionParameter.getId(), actionParameter.getType());
+			logger.warn("Action - actionParameter id: {} - type {}", actionParameter.getId(),
+					actionParameter.getType());
 		}
-		
+
 		logger.warn("Action type name: {} ", action.getActionType().getMetadata().getName());
-		
+
 		for (Entry eventProperty : event.getProperties().entrySet()) {
 			logger.warn("Event property {} - {}", eventProperty.getKey(), eventProperty.getValue());
 		}
 		
-		for (Entry eventAttr : event.getAttributes().entrySet()) {
-			logger.warn("Event attribute {} - {}", eventAttr.getKey(), eventAttr.getValue());
-		}
-		
 		if (event.getSource() != null) {
-			logger.warn("Source - Item id:{} ", event.getSource().getItemId());
-			logger.warn("Source - Item type:{} ", event.getSource().getItemType());
-			logger.warn("Source - Version:{} ", event.getSource().getVersion());
+			Event source = (Event) event.getSource();
+			logger.warn("Source - Item id:{} ", source.getItemId());
+			logger.warn("Source - Item type:{} ", source.getItemType());
+			logger.warn("Source - Version:{} ", source.getVersion());
+			logger.warn("Source - Class:{} ", source.getClass());
+			
+			for (Entry sourceEventProperty : source.getProperties().entrySet()) {
+				logger.warn("Source Event property {} - {}", sourceEventProperty.getKey(), sourceEventProperty.getValue());
+			}
 			
 			if (event.getSource() instanceof Goal) {
 				Goal goal = (Goal) event.getSource();
-				logger.warn("Source - goal id {} - name {}",  goal.getMetadata().getId(), goal.getMetadata().getName());
+				logger.warn("Source - goal id {} - name {}", goal.getMetadata().getId(), goal.getMetadata().getName());
 			}
 		}
 
@@ -155,17 +159,50 @@ public class SlackMessageAction implements ActionExecutor {
 			logger.warn("Target - Item id:{} ", event.getTarget().getItemId());
 			logger.warn("Target - Item type:{} ", event.getTarget().getItemType());
 			logger.warn("Target - Version:{} ", event.getTarget().getVersion());
+			logger.warn("Target - Class:{} ", event.getTarget().getClass());
+
 			if (event.getTarget() instanceof Goal) {
 				Goal goal = (Goal) event.getTarget();
-				logger.warn("Target - goal id {} - name {}",  goal.getMetadata().getId(), goal.getMetadata().getName());
+				
+				logger.warn("Target - goal id {} - name {} - description {}", goal.getMetadata().getId(), goal.getMetadata().getName(), goal.getMetadata().getDescription());
+				logger.warn("Target - goal item type " , goal.getItemType());
 			}
 		}
-		
+
 		for (ActionPostExecutor act : event.getActionPostExecutors()) {
 			logger.warn("act class::{} ", act.getClass());
 		}
 
 	}
+
+	/**
+	 * 
+	 * @param pt
+	 * @param tagsToExclude
+	 * @return
+	 */
+	private boolean excludeProperty(PropertyType pt, String[] tagsToExclude) {
+
+		// Exclude properties that don't have any tag
+		if (pt == null || pt.getMetadata() == null || pt.getMetadata().getName() == null) {
+			return true;
+		}
+
+		// Exclude properties that don't have any system tags
+		if (pt.getMetadata().getSystemTags() == null || pt.getMetadata().getSystemTags().size() == 0) {
+			return true;
+		}
+
+		// Exclude properties depending in the tag
+		for (String tagToExclude : tagsToExclude) {
+			if (pt.getMetadata().getSystemTags().contains(tagToExclude)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	/**
 	 * Building the json that will be sent to slack
 	 * 
@@ -176,33 +213,67 @@ public class SlackMessageAction implements ActionExecutor {
 	private String buildJsonForSlackUsingAttachments(Action action, Event event) throws JSONException {
 
 		supperLogger(action, event);
-		
+
+		JSONObject slackAttachment1 = getJsonFromCfgValues(event);
+
+		JSONArray fields = new JSONArray();
+
+		String[] tagsToExclude = unomiSystemTagsExclude.split(",");
+
+		fields = getJsonFromProfileProperties(event, fields, tagsToExclude);
+
+		fields.put(getJsonFromSessionProperty("Country", "sessionCountryName", event));
+		fields.put(getJsonFromSessionProperty("City", "sessionCity", event));
+		fields.put(getJsonFromSessionProperty("Device category", "deviceCategory", event));
+
+		slackAttachment1.put("fields", fields);
+
 		JSONArray attachments = new JSONArray();
-		JSONObject attachment1 = new JSONObject();
+		attachments.put(slackAttachment1);
+
+		JSONObject jsonForSlack = new JSONObject();
+		jsonForSlack.put("attachments", attachments);
+
+		String slackString = jsonForSlack.toString();
+
+		logger.warn("text sent to slack: " + slackString + "\n\n");
+
+		return slackString;
+	}
+
+	/**
+	 * 
+	 * @param event
+	 * @param attachment1
+	 * @return
+	 * @throws JSONException
+	 */
+	private JSONObject getJsonFromCfgValues(Event event) throws JSONException {
 
 		String techInfo = "";
 		String processedSlackMessageTitle = slackMessageTitle;
 		if (event.getTarget() instanceof Goal) {
 			Goal goal = (Goal) event.getTarget();
-			techInfo = " - Goal id: " + goal.getMetadata().getId();
 			processedSlackMessageTitle = slackMessageTitle.replace("{goalName}", goal.getMetadata().getName());
+			techInfo = event.getScope() + " - Goal id: " + goal.getMetadata().getId();
+		} else {
+			processedSlackMessageTitle = "We actually don't know that much on what trigger this action";
 		}
-		
-		String[] tagsToExclude = unomiSystemTagsExclude.split(",");
 
+		JSONObject attachment1 = new JSONObject();
 		attachment1.put("title", processedSlackMessageTitle);
-		
+
 		String processedSlacMessagePretext = slackMessagePretext.replace("{scope}", event.getScope());
 		attachment1.put("pretext", processedSlacMessagePretext);
 		attachment1.put("thumb_url", slackMessageThumbUrl);
 		attachment1.put("color", slackMessageColor);
 		attachment1.put("text", slackMessageText);
 		attachment1.put("fallback", slackMessageFallback);
-		attachment1.put("footer", "Apache Unomi / Slack integration " + techInfo);
 		attachment1.put("ts", System.currentTimeMillis() / 1000);
+		attachment1.put("footer", "Apache Unomi integration - " + techInfo);
 		attachment1.put("footer_icon",
 				"https://www.jahia.com/files/live/sites/jahiacom/files/platform/Marketing%20Factory/Images/unomi-logo.png");
-		
+
 		// Build the slack button (called slackAction)
 		JSONArray slackActions = new JSONArray();
 		JSONObject slackAction1 = new JSONObject();
@@ -219,134 +290,131 @@ public class SlackMessageAction implements ActionExecutor {
 		slackActions.put(slackAction1);
 		attachment1.put("actions", slackActions);
 
-		JSONArray fields = new JSONArray();
-		
-		propertiesLoop:
-		for (Entry propertyInVisitorProfile : event.getProfile().getProperties().entrySet()) {
-			JSONObject field = new JSONObject();
+		return attachment1;
+	}
+
+	/**
+	 * 
+	 * @param event
+	 * @param fields
+	 * @param tagsToExclude
+	 * @return
+	 * @throws JSONException
+	 */
+	private JSONArray getJsonFromProfileProperties(Event event, JSONArray fields, String[] tagsToExclude)
+			throws JSONException {
+
+		for (Entry<String, Object> propertyInVisitorProfile : event.getProfile().getProperties().entrySet()) {
 
 			String key = propertyInVisitorProfile.getKey().toString();
 			logger.debug("\nkey : {}", key);
 
 			PropertyType pt = profileService.getPropertyType(key);
-			
-			// Exclude properties that don't have any tag
-			if (pt == null || pt.getMetadata() == null || pt.getMetadata().getName() == null) {
+
+			if (excludeProperty(pt, tagsToExclude))
 				continue;
-			}
-			
-			// Exclude properties that don't have any system tags 
-			if (pt.getMetadata().getSystemTags() == null || pt.getMetadata().getSystemTags().size() == 0) {
-				continue;
-			}
 
-			logger.warn("system tags {}", pt.getMetadata().getSystemTags());
-
-			// Exclude properties depending in the tag
-			for (String tagToExclude : tagsToExclude) {
-				if (pt.getMetadata().getSystemTags().contains(tagToExclude)) {
-					continue propertiesLoop;
-				}
-			}
-
-			key = pt.getMetadata().getName();
-			field.put("title", key);
-
-			String value = propertyInVisitorProfile.getValue().toString();
-
-			if (value.length() > 65) {
-				value = value.substring(0, 63) + "...";
-			}
-
-			field.put("value", value);
-			field.put("short", true);
-
+			String propertyName = pt.getMetadata().getName();
+			JSONObject field = getJsonObjfromProperty(propertyName, propertyInVisitorProfile.getValue().toString());
 			fields.put(field);
 
-			String str = "\n" + propertyInVisitorProfile.getKey() + " - " + propertyInVisitorProfile.getValue();
-			logger.debug("profileProperty : {}", str);
+			logger.debug("Profile Property : {}", field);
 		}
 
-		// Device category
-		if (event.getSession().getProperty("deviceCategory") != null
-				&& event.getSession().getProperty("deviceCategory").toString().length() > 0) {
-			JSONObject deviceCategory = new JSONObject();
-			deviceCategory.put("value", event.getSession().getProperty("deviceCategory"));
-			deviceCategory.put("title", "Device Category");
-			deviceCategory.put("short", true);
-			fields.put(deviceCategory);
+		return fields;
+	}
+
+	/**
+	 * 
+	 * @param title
+	 * @param value
+	 * @return
+	 * @throws JSONException
+	 */
+	private JSONObject getJsonObjfromProperty(String title, Object value) throws JSONException {
+
+		String strValue = (String) value;
+		JSONObject slackField = new JSONObject();
+
+		// Beyond 65 characters, the values won't display nicely
+		if (strValue.length() > 65) {
+			strValue = strValue.substring(0, 63) + "...";
 		}
 
-		// Country
-		if (event.getSession().getProperty("sessionCountryName") != null
-				&& event.getSession().getProperty("sessionCountryName").toString().length() > 0) {
-			JSONObject country = new JSONObject();
-			country.put("value", event.getSession().getProperty("sessionCountryName"));
-			country.put("title", "Country");
-			country.put("short", true);
-			fields.put(country);
+		slackField.put("value", strValue);
+		slackField.put("title", title);
+		slackField.put("short", true);
+
+		return slackField;
+	}
+
+	/**
+	 * Specific for session property
+	 * 
+	 * @param friendlyName
+	 * @param propertyKey
+	 * @param event
+	 * @return
+	 * @throws JSONException
+	 */
+	private JSONObject getJsonFromSessionProperty(String friendlyName, String propertyKey, Event event)
+			throws JSONException {
+
+		if (event.getSession().getProperty(propertyKey) != null
+				&& event.getSession().getProperty(propertyKey).toString().length() > 0) {
+
+			return getJsonObjfromProperty(friendlyName, event.getSession().getProperty(propertyKey));
+
 		}
 
-		// City
-		if (event.getSession().getProperty("sessionCity") != null
-				&& event.getSession().getProperty("sessionCity").toString().length() > 0) {
-			JSONObject city = new JSONObject();
-			city.put("value", event.getSession().getProperty("sessionCity"));
-			city.put("title", "City");
-			city.put("short", true);
-			fields.put(city);
-		}
-
-		attachment1.put("fields", fields);
-		attachments.put(attachment1);
-		
-		JSONObject jsonForSlack = new JSONObject();
-		jsonForSlack.put("attachments", attachments);
-		String slackString = jsonForSlack.toString();
-
-		logger.warn("text sent to slack: " + slackString + "\n\n");
-
-		return slackString;
+		return null;
 	}
 
 	/**
 	 * Execute the http request
+	 * 
 	 * @param textUrl
 	 * @param jsonForSlack
 	 * @return
 	 * @throws IOException
 	 */
-	private int executePostRequestToSlack(String textUrl, String jsonForSlack) throws IOException {
+	private int executePostRequestToSlack(String textUrl, String jsonForSlack) {
 
-		CloseableHttpClient client = HttpClients.createDefault();
-		HttpPost httpPost = new HttpPost(textUrl);
-		logger.debug("jsonText : {}", jsonForSlack);
-
-		StringEntity entity = new StringEntity(jsonForSlack);
-		httpPost.setEntity(entity);
-
-		httpPost.setHeader("Accept", "application/json");
-		httpPost.setHeader("Content-type", "application/json");
-
-		CloseableHttpResponse response = null;
-
+		CloseableHttpClient client = null ;
+		
 		try {
-			response = client.execute(httpPost);
-		} catch (IOException e) {
-			if (response == null || response.getStatusLine() == null
-					|| response.getStatusLine().getStatusCode() != 200) {
-				logger.error("Error when executing request to slack, response:  = {}", response);
-				return EventService.NO_CHANGE;
-			}
-		} finally {
-			client.close();
 			
+			 client = HttpClients.createDefault();
+			HttpPost httpPost = new HttpPost(textUrl);
+			
+			StringEntity entity = new StringEntity(jsonForSlack);
+			httpPost.setEntity(entity);
+			
+			httpPost.setHeader("Accept", "application/json");
+			httpPost.setHeader("Content-type", "application/json");
+			
+			CloseableHttpResponse response = null;
+			
+			response = client.execute(httpPost);
+			
+			if (response.getStatusLine().getStatusCode() != 200) {
+				logger.error("Error when executing request to slack - http code {} - response {}", response.getStatusLine().getStatusCode(), response.toString());
+			}
+			
+		} catch (IOException e) {
+			logger.error("Error when executing request to slack: {}", e);
+			return EventService.NO_CHANGE;
+		} finally {
+			try {
+				client.close();
+			} catch (IOException e) {
+				logger.error("Cannot close: {}", e);
+			}
 		}
 
 		return EventService.NO_CHANGE;
-
 	}
-
+	
 	public String getSlackHookMessageServiceUrl() {
 		return slackHookMessageServiceUrl;
 	}
