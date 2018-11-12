@@ -24,8 +24,4 @@ This is a proof of concepts.
 - Apache Unomi version 1.3.0
 
 ## Installation
-To install it, compile it and then execute the two following lines:
-```
-feature:repo-add mvn:org.apache.unomi/unomi-slack-karaf-kar/${project.version}/xml/features
-feature:install unomi-slack-karaf-kar
-```
+To install it, compile it and add the .kar to the deploy folder of your unomi
