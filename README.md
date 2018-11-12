@@ -16,7 +16,7 @@
   -->
 
 
-Apache Unomi Twilio Integration
+Apache Unomi Slack Integration
 =================================
 This is a proof of concepts.    
 
@@ -26,6 +26,6 @@ This is a proof of concepts.
 ## Installation
 To install it, compile it and then execute the two following lines:
 ```
-feature:repo-add mvn:org.apache.unomi/unomi-twilio-karaf-kar/${project.version}/xml/features
-feature:install unomi-twilio-karaf-kar
+feature:repo-add mvn:org.apache.unomi/unomi-slack-karaf-kar/${project.version}/xml/features
+feature:install unomi-slack-karaf-kar
 ```
