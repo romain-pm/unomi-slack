@@ -144,12 +144,21 @@ public class SlackMessageAction implements ActionExecutor {
 			logger.warn("Source - Item id:{} ", event.getSource().getItemId());
 			logger.warn("Source - Item type:{} ", event.getSource().getItemType());
 			logger.warn("Source - Version:{} ", event.getSource().getVersion());
+			
+			if (event.getSource() instanceof Goal) {
+				Goal goal = (Goal) event.getSource();
+				logger.warn("Source - goal id {} - name {}",  goal.getMetadata().getId(), goal.getMetadata().getName());
+			}
 		}
 
 		if (event.getTarget() != null) {
 			logger.warn("Target - Item id:{} ", event.getTarget().getItemId());
 			logger.warn("Target - Item type:{} ", event.getTarget().getItemType());
 			logger.warn("Target - Version:{} ", event.getTarget().getVersion());
+			if (event.getTarget() instanceof Goal) {
+				Goal goal = (Goal) event.getTarget();
+				logger.warn("Target - goal id {} - name {}",  goal.getMetadata().getId(), goal.getMetadata().getName());
+			}
 		}
 		
 		for (ActionPostExecutor act : event.getActionPostExecutors()) {
@@ -172,18 +181,19 @@ public class SlackMessageAction implements ActionExecutor {
 		JSONObject attachment1 = new JSONObject();
 
 		String techInfo = "";
-		
+		String processedSlackMessageTitle = slackMessageTitle;
 		if (event.getTarget() instanceof Goal) {
 			Goal goal = (Goal) event.getTarget();
 			techInfo = " - Goal id: " + goal.getMetadata().getId();
-			slackMessageTitle = slackMessageTitle.replace("{goalName}", goal.getMetadata().getName());
+			processedSlackMessageTitle = slackMessageTitle.replace("{goalName}", goal.getMetadata().getName());
 		}
+		
 		String[] tagsToExclude = unomiSystemTagsExclude.split(",");
 
-		attachment1.put("title", slackMessageTitle);
+		attachment1.put("title", processedSlackMessageTitle);
 		
-		slackMessagePretext = slackMessagePretext.replace("{scope}", event.getScope());
-		attachment1.put("pretext", slackMessagePretext);
+		String processedSlacMessagePretext = slackMessagePretext.replace("{scope}", event.getScope());
+		attachment1.put("pretext", processedSlacMessagePretext);
 		attachment1.put("thumb_url", slackMessageThumbUrl);
 		attachment1.put("color", slackMessageColor);
 		attachment1.put("text", slackMessageText);
@@ -227,7 +237,6 @@ public class SlackMessageAction implements ActionExecutor {
 			
 			// Exclude properties that don't have any system tags 
 			if (pt.getMetadata().getSystemTags() == null || pt.getMetadata().getSystemTags().size() == 0) {
-				logger.warn("excluding {}", key);
 				continue;
 			}
 
@@ -236,7 +245,6 @@ public class SlackMessageAction implements ActionExecutor {
 			// Exclude properties depending in the tag
 			for (String tagToExclude : tagsToExclude) {
 				if (pt.getMetadata().getSystemTags().contains(tagToExclude)) {
-					logger.warn("excluding {} because it has systemTag {}", key, tagToExclude);
 					continue propertiesLoop;
 				}
 			}
@@ -330,11 +338,10 @@ public class SlackMessageAction implements ActionExecutor {
 				logger.error("Error when executing request to slack, response:  = {}", response);
 				return EventService.NO_CHANGE;
 			}
+		} finally {
+			client.close();
+			
 		}
-
-		logger.debug("slack response.statusCode: {} ", response.getStatusLine().getStatusCode());
-
-		client.close();
 
 		return EventService.NO_CHANGE;
 

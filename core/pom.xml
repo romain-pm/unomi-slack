@@ -33,7 +33,7 @@
 			<version>1.4.0-incubating-SNAPSHOT</version>
 			<scope>provided</scope>
 		</dependency>
-  
+
 		<dependency>
 			<groupId>org.json</groupId>
 			<artifactId>json</artifactId>
