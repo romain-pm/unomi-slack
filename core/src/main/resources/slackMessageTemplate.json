@@ -1,0 +1,43 @@
+ {
+ 	"attachments": [{
+ 		"thumb_url": "https://assets.rbl.ms/18341366/980x.jpg",
+ 		"color": "#00A0E3",
+ 		"footer": "Apache Unomi integration - digitall - Goal id: _1s8qx3qvn",
+ 		"pretext": "Something happened on localhost / digitall website",
+ 		"footer_icon": "https://www.jahia.com/files/live/sites/jahiacom/files/platform/Marketing%20Factory/Images/unomi-logo.png",
+ 		"text": "Here is what we know so far on the visitor:",
+ 		"title": "There is a new digitall home view",
+ 		"fields": [{
+ 			"short": true,
+ 			"title": "Proximity",
+ 			"value": "close"
+ 		}, {
+ 			"short": true,
+ 			"title": "weather",
+ 			"value": "[snow]"
+ 		}, {
+ 			"short": true,
+ 			"title": "prop1 text",
+ 			"value": "Building products to make digital simpler products to make digi..."
+ 		}, {
+ 			"short": true,
+ 			"title": "Country",
+ 			"value": "Switzerland"
+ 		}, {
+ 			"short": true,
+ 			"title": "City",
+ 			"value": "Geneva"
+ 		}, {
+ 			"short": true,
+ 			"title": "Device category",
+ 			"value": "Personal computer"
+ 		}],
+ 		"fallback": "Error in the slack UI, please ask your admin about the Unomi / slack integration",
+ 		"actions": [{
+ 			"text": "Look at the profile in MFactory",
+ 			"type": "button",
+ 			"url": "http://localhost:8080/cms/edit/default/en/sites/digitall.wem-profile.html?wemProfileType=profiles&wemProfileId=2c2c150f-ae2e-48fb-a221-45d1bee96276"
+ 		}],
+ 		"ts": 1542065514
+ 	}]
+ }

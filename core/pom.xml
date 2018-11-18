@@ -50,25 +50,29 @@
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt</artifactId>
 			<version>0.4</version>
+			<scope>provided</scope>
 		</dependency>
 
 		<dependency>
 			<groupId>log4j</groupId>
 			<artifactId>log4j</artifactId>
 			<version>1.2.16</version>
+			<scope>provided</scope>
 		</dependency>
 
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-log4j12</artifactId>
 			<version>1.6.4</version>
+			<scope>provided</scope>
+
 		</dependency>
 
 		<dependency>
-		  <groupId>org.apache.httpcomponents</groupId>
-		  <artifactId>httpclient-osgi</artifactId>
-		  <version>4.5.6</version>
-		  <type>bundle</type>
+			<groupId>org.apache.httpcomponents</groupId>
+			<artifactId>httpclient-osgi</artifactId>
+			<type>bundle</type>
+			<scope>provided</scope>
 		</dependency>
 
 	</dependencies>
@@ -83,16 +87,17 @@
 					<instructions>
 						<Embed-Dependency>*;scope=compile|runtime</Embed-Dependency>
 						<Import-Package>
-							 com.ibm.*;resolution:=optional,
-                            com.sun.*;resolution:=optional,
-                            javax.*;resolution:=optional,
-                            org.hamcrest.*;resolution:=optional,
-                            *
+							com.ibm.*;resolution:=optional,
+							com.sun.*;resolution:=optional,
+							javax.*;resolution:=optional,
+							org.hamcrest.*;resolution:=optional,
+							*
 						</Import-Package>
 						<Embed-Dependency>*; scope=compile; type=!pom; inline=false</Embed-Dependency>
-                        <Embed-Transitive>false</Embed-Transitive>
-                        <_removeheaders>Include-Resource, Private-Package, Embed-Dependency, Embed-Transitive
-                        </_removeheaders>
+						<Embed-Transitive>false</Embed-Transitive>
+						<_removeheaders>Include-Resource, Private-Package,
+							Embed-Dependency, Embed-Transitive
+						</_removeheaders>
 					</instructions>
 				</configuration>
 			</plugin>
@@ -122,7 +127,7 @@
 					</execution>
 				</executions>
 			</plugin>
-			
+
 		</plugins>
 	</build>
 </project>

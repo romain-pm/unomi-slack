@@ -19,6 +19,7 @@
 package org.apache.unomi.slack.actions;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -64,7 +65,7 @@ public class SlackMessageAction implements ActionExecutor {
 	private ProfileService profileService;
 
 	/**
-	 * The execute method, only managing logging and calling internalExecute
+	 * The execute method, only managing try catch logic, logging and calling internalExecute
 	 */
 	@Override
 	public int execute(Action action, Event event) {
@@ -104,12 +105,12 @@ public class SlackMessageAction implements ActionExecutor {
 	 */
 	protected int internalExecute(Action action, Event event) throws Exception {
 
+		String jsonForSlack = buildJsonForSlack(action, event);
+
 		String slackUrl = slackHookMessageServiceUrl + "/" + slackHookMessageServiceWorkspaceId + "/"
 				+ slackHookMessageServiceToken;
 
 		logger.debug("slackUrl: {} ", slackUrl);
-
-		String jsonForSlack = buildJsonForSlackUsingAttachments(action, event);
 
 		executePostRequestToSlack(slackUrl, jsonForSlack);
 
@@ -124,119 +125,96 @@ public class SlackMessageAction implements ActionExecutor {
 	 */
 	private void supperLogger(Action action, Event event) {
 
-		logger.warn("Event type: {} - item type: {} - version: {}", event.getEventType(), event.getItemType(),
+		logger.debug("Event type: {} - item type: {} - version: {}", event.getEventType(), event.getItemType(),
 				event.getVersion());
-
+		
+		
 		for (Parameter actionParameter : action.getActionType().getParameters()) {
-			logger.warn("Action - actionParameter id: {} - type {}", actionParameter.getId(),
+			logger.debug("Action - actionParameter id: {} - type {}", actionParameter.getId(),
 					actionParameter.getType());
 		}
+		
+		logger.debug("Action type name: {} ", action.getActionType().getMetadata().getName());
 
-		logger.warn("Action type name: {} ", action.getActionType().getMetadata().getName());
-
-		for (Entry eventProperty : event.getProperties().entrySet()) {
-			logger.warn("Event property {} - {}", eventProperty.getKey(), eventProperty.getValue());
+		for (Entry<String,Object> eventProperty : event.getProperties().entrySet()) {
+			logger.debug("Event property {} - {}", eventProperty.getKey(), eventProperty.getValue());
 		}
 		
 		if (event.getSource() != null) {
 			Event source = (Event) event.getSource();
-			logger.warn("Source - Item id:{} ", source.getItemId());
-			logger.warn("Source - Item type:{} ", source.getItemType());
-			logger.warn("Source - Version:{} ", source.getVersion());
-			logger.warn("Source - Class:{} ", source.getClass());
+			logger.debug("Source - Item id:{} ", source.getItemId());
+			logger.debug("Source - Item type:{} ", source.getItemType());
+			logger.debug("Source - Version:{} ", source.getVersion());
+			logger.debug("Source - Class:{} ", source.getClass());
 			
-			for (Entry sourceEventProperty : source.getProperties().entrySet()) {
-				logger.warn("Source Event property {} - {}", sourceEventProperty.getKey(), sourceEventProperty.getValue());
+			for (Entry<String,Object> sourceEventProperty : source.getProperties().entrySet()) {
+				logger.debug("Source Event property {} - {}", sourceEventProperty.getKey(), sourceEventProperty.getValue());
 			}
 			
 			if (event.getSource() instanceof Goal) {
 				Goal goal = (Goal) event.getSource();
-				logger.warn("Source - goal id {} - name {}", goal.getMetadata().getId(), goal.getMetadata().getName());
+				logger.debug("Source - goal id {} - name {}", goal.getMetadata().getId(), goal.getMetadata().getName());
 			}
 		}
 
 		if (event.getTarget() != null) {
-			logger.warn("Target - Item id:{} ", event.getTarget().getItemId());
-			logger.warn("Target - Item type:{} ", event.getTarget().getItemType());
-			logger.warn("Target - Version:{} ", event.getTarget().getVersion());
-			logger.warn("Target - Class:{} ", event.getTarget().getClass());
+			logger.debug("Target - Item id:{} ", event.getTarget().getItemId());
+			logger.debug("Target - Item type:{} ", event.getTarget().getItemType());
+			logger.debug("Target - Version:{} ", event.getTarget().getVersion());
+			logger.debug("Target - Class:{} ", event.getTarget().getClass());
 
 			if (event.getTarget() instanceof Goal) {
 				Goal goal = (Goal) event.getTarget();
 				
-				logger.warn("Target - goal id {} - name {} - description {}", goal.getMetadata().getId(), goal.getMetadata().getName(), goal.getMetadata().getDescription());
-				logger.warn("Target - goal item type " , goal.getItemType());
+				logger.debug("Target - goal id {} - name {} - description {}", goal.getMetadata().getId(), goal.getMetadata().getName(), goal.getMetadata().getDescription());
+				logger.debug("Target - goal item type " , goal.getItemType());
 			}
 		}
 
 		for (ActionPostExecutor act : event.getActionPostExecutors()) {
-			logger.warn("act class::{} ", act.getClass());
+			logger.debug("act class::{} ", act.getClass());
 		}
 
 	}
 
-	/**
-	 * 
-	 * @param pt
-	 * @param tagsToExclude
-	 * @return
-	 */
-	private boolean excludeProperty(PropertyType pt, String[] tagsToExclude) {
-
-		// Exclude properties that don't have any tag
-		if (pt == null || pt.getMetadata() == null || pt.getMetadata().getName() == null) {
-			return true;
-		}
-
-		// Exclude properties that don't have any system tags
-		if (pt.getMetadata().getSystemTags() == null || pt.getMetadata().getSystemTags().size() == 0) {
-			return true;
-		}
-
-		// Exclude properties depending in the tag
-		for (String tagToExclude : tagsToExclude) {
-			if (pt.getMetadata().getSystemTags().contains(tagToExclude)) {
-				return true;
-			}
-		}
-
-		return false;
-	}
+	
 
 	/**
-	 * Building the json that will be sent to slack
+	 * Build the json that will be sent to slack
 	 * 
 	 * @param event
 	 * @return
 	 * @throws JSONException
 	 */
-	private String buildJsonForSlackUsingAttachments(Action action, Event event) throws JSONException {
+	private String buildJsonForSlack(Action action, Event event) throws JSONException {
 
 		supperLogger(action, event);
-
-		JSONObject slackAttachment1 = getJsonFromCfgValues(event);
-
-		JSONArray fields = new JSONArray();
+		
+		JSONArray slackFields = new JSONArray();
 
 		String[] tagsToExclude = unomiSystemTagsExclude.split(",");
 
-		fields = getJsonFromProfileProperties(event, fields, tagsToExclude);
+		slackFields = getJsonFromProfileProperties(event.getProfile().getProperties(), slackFields, tagsToExclude);
+		
+		// add the json from session properties
+		slackFields.put(getJsonFromSessionProperty("Country", "sessionCountryName", event));
+		slackFields.put(getJsonFromSessionProperty("City", "sessionCity", event));
+		slackFields.put(getJsonFromSessionProperty("Device category", "deviceCategory", event));
+		
+		// Slack defines "attachments" in the message that is sent
+		JSONObject slackAttachment1 = getJsonFromCfgValues(event);
 
-		fields.put(getJsonFromSessionProperty("Country", "sessionCountryName", event));
-		fields.put(getJsonFromSessionProperty("City", "sessionCity", event));
-		fields.put(getJsonFromSessionProperty("Device category", "deviceCategory", event));
-
-		slackAttachment1.put("fields", fields);
+		slackAttachment1.put("fields", slackFields);
 
 		JSONArray attachments = new JSONArray();
 		attachments.put(slackAttachment1);
-
+		
 		JSONObject jsonForSlack = new JSONObject();
 		jsonForSlack.put("attachments", attachments);
 
 		String slackString = jsonForSlack.toString();
 
-		logger.warn("text sent to slack: " + slackString + "\n\n");
+		logger.debug("text sent to slack: " + slackString + "\n\n");
 
 		return slackString;
 	}
@@ -301,27 +279,55 @@ public class SlackMessageAction implements ActionExecutor {
 	 * @return
 	 * @throws JSONException
 	 */
-	private JSONArray getJsonFromProfileProperties(Event event, JSONArray fields, String[] tagsToExclude)
+	private JSONArray getJsonFromProfileProperties(Map<String,Object> profileProperties, JSONArray fields, String[] tagsToExclude)
 			throws JSONException {
 
-		for (Entry<String, Object> propertyInVisitorProfile : event.getProfile().getProperties().entrySet()) {
+		for (Entry<String, Object> propertyInVisitorProfile : profileProperties.entrySet()) {
 
 			String key = propertyInVisitorProfile.getKey().toString();
 			logger.debug("\nkey : {}", key);
 
 			PropertyType pt = profileService.getPropertyType(key);
 
-			if (excludeProperty(pt, tagsToExclude))
+			if (ignoreProperty(pt, tagsToExclude))
 				continue;
 
 			String propertyName = pt.getMetadata().getName();
-			JSONObject field = getJsonObjfromProperty(propertyName, propertyInVisitorProfile.getValue().toString());
-			fields.put(field);
+			JSONObject slackField = getSlackFieldfromProperty(propertyName, propertyInVisitorProfile.getValue().toString());
+			fields.put(slackField);
 
-			logger.debug("Profile Property : {}", field);
+			logger.debug("Profile Property : {}", slackField);
 		}
 
 		return fields;
+	}
+	
+	/**
+	 * Define if a profile property should be ignored, based on the tags to exclude
+	 * @param pt
+	 * @param tagsToExclude
+	 * @return
+	 */
+	private boolean ignoreProperty(PropertyType pt, String[] tagsToExclude) {
+
+		// Exclude properties that don't have any tag
+		if (pt == null || pt.getMetadata() == null || pt.getMetadata().getName() == null) {
+			return true;
+		}
+
+		// Exclude properties that don't have any system tags
+		if (pt.getMetadata().getSystemTags() == null || pt.getMetadata().getSystemTags().size() == 0) {
+			return true;
+		}
+
+		// Exclude properties depending in the tag
+		for (String tagToExclude : tagsToExclude) {
+			if (pt.getMetadata().getSystemTags().contains(tagToExclude)) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -331,7 +337,7 @@ public class SlackMessageAction implements ActionExecutor {
 	 * @return
 	 * @throws JSONException
 	 */
-	private JSONObject getJsonObjfromProperty(String title, Object value) throws JSONException {
+	private JSONObject getSlackFieldfromProperty(String title, Object value) throws JSONException {
 
 		String strValue = (String) value;
 		JSONObject slackField = new JSONObject();
@@ -363,7 +369,7 @@ public class SlackMessageAction implements ActionExecutor {
 		if (event.getSession().getProperty(propertyKey) != null
 				&& event.getSession().getProperty(propertyKey).toString().length() > 0) {
 
-			return getJsonObjfromProperty(friendlyName, event.getSession().getProperty(propertyKey));
+			return getSlackFieldfromProperty(friendlyName, event.getSession().getProperty(propertyKey));
 
 		}
 
@@ -383,8 +389,7 @@ public class SlackMessageAction implements ActionExecutor {
 		CloseableHttpClient client = null ;
 		
 		try {
-			
-			 client = HttpClients.createDefault();
+			client = HttpClients.createDefault();
 			HttpPost httpPost = new HttpPost(textUrl);
 			
 			StringEntity entity = new StringEntity(jsonForSlack);
